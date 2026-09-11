@@ -3,6 +3,16 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+from load_data import blade_dat, airfoil_data
+
+
+#function to compute effiecency for one tip speed integrating over r/R whole rotor blade
+def C_p_lambda(tip_speed, R, r, B, F):
+    C_p = 0
+    # radial discretization
+    
+    
 
 
 #function to compute efficiency for given values of lambda  integrating over r/R whole rotor blade
