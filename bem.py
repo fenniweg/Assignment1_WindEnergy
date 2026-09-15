@@ -97,9 +97,7 @@ def BEM_algorithm (s,theta_p,method):
 
     #loop through each blade element
     for i in range(len(r_list)):
-        if i ==0:
-            continue
-        if i ==3:
+        if i ==3: #just for testing, remove later
             break 
         r = r_list[i]
         chord = chord_list[i]
