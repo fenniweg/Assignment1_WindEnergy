@@ -34,7 +34,6 @@ rho = 1.225 #air density in kg/m^3
 #not sure about this one, not given in assignment ?
 V_0 = 11 #wind speed at which to compute power coefficient, Cp ??
 
-F = 1 #change maybe for tip loss correction, not sure if this is needed for this assignment
 
 
 

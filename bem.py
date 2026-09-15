@@ -1,7 +1,7 @@
 #BEM algorithm steady
 
 import numpy as np
-from load_data import blade_dat, airfoil_data, R,n_blades,rho,v_min,v_max,V_0,F,test
+from load_data import blade_dat, airfoil_data, R,n_blades,rho,v_min,v_max,V_0
 
 
 
