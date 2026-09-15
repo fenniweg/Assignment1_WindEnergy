@@ -1,9 +1,12 @@
 #BEM algorithm steady
 
 import numpy as np
-from load_data import blade_dat, airfoil_data, R,n_blades,rho,v_min,v_max,V_0,F
+from load_data import blade_dat, airfoil_data, R,n_blades,rho,v_min,v_max,V_0,F,test
 
 
+
+
+#old bem loop can be deleted when it wor
 def bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method):
 
     a = 0
@@ -76,7 +79,11 @@ def bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method):
 
 
 def BEM_algorithm (s,theta_p,method):
-    omega = s*V_0/R
+    # omega = s*V_0/R
+    # print(f"Omega: {omega}")
+    omega = 0.9 #rad/s
+    V_0 = 10
+    
 
     #Load blade data
     r_list = blade_dat['r'].values
@@ -86,13 +93,21 @@ def BEM_algorithm (s,theta_p,method):
 
     p_n_list = []
     p_t_list = []
+    mu = []
 
     #loop through each blade element
     for i in range(len(r_list)):
+        if i ==0:
+            continue
+        if i ==3:
+            break 
         r = r_list[i]
         chord = chord_list[i]
         beta = beta_list[i]
         t_over_c = t_over_c_list[i]
+        mu.append(r/R)
+
+        print(f"Blade element {i}: r={r}, chord={chord}, beta={beta}, t/c={t_over_c}")
 
     #Initialze a and a_prime, convergence tolerance
 
@@ -102,27 +117,38 @@ def BEM_algorithm (s,theta_p,method):
     
     #Calculate flowangle
         psi = np.arctan((1-a)*V_0/((1+a_prime)*omega*r))
+        print(f"Initial psi: {psi}")
 
     #Compute local angle of attack alpha
         alpha = psi-(beta+theta_p)
+        print(f"Initial alpha: {alpha}")
+        
 
         #Lookup C_l and C_d from airfoil data based on alpha with double interpolation
         #Interpolate first the values for each of the  6 different airfoils based on alpha
         C_l_thickness = np.zeros((6))
         C_d_thickness = np.zeros((6))
+
+       
         
         for k in range (6):
-            C_l_thickness[k] = np.interp(alpha,airfoil_data[k][:,1],airfoil_data[k][:,0])
-            C_d_thickness[k] = np.interp(alpha,airfoil_data[k][:,2],airfoil_data[k][:,0])
+            C_l_thickness[k] = np.interp(alpha,airfoil_data[k][:,0],airfoil_data[k][:,1])
+            C_d_thickness[k] = np.interp(alpha,airfoil_data[k][:,0],airfoil_data[k][:,2])
 
-        print(C_l_thickness)    
-
+        
         #Interpolate to actual thickness
         thickness_profile = [100,60,48,36,30.1,24.1]
-        C_l = np.interp(t_over_c, C_l_thickness,thickness_profile)
-        C_d = np.interp(t_over_c, C_d_thickness,thickness_profile)
-            
 
+        #Use np.argsort to sort the thickness profile and corresponding C_l and C_d values
+        sort_indices = np.argsort(thickness_profile)
+        x_p_sorted = np.array(thickness_profile)[sort_indices]
+        y_p_sorted_C_l = np.array(C_l_thickness)[sort_indices]
+        y_p_sorted_C_d = np.array(C_d_thickness)[sort_indices]
+
+        C_l = np.interp(t_over_c,x_p_sorted,y_p_sorted_C_l)
+        C_d = np.interp(t_over_c,x_p_sorted,y_p_sorted_C_d)
+        print(f"t/c: {t_over_c}, Interpolated C_l: {C_l}, C_d: {C_d}")
+        
         C_n = C_l*np.cos(psi) + C_d*np.sin(psi)
         C_t = C_l*np.sin(psi) - C_d*np.cos(psi)
 
@@ -134,6 +160,7 @@ def BEM_algorithm (s,theta_p,method):
         i = 0
 
         while True:
+            i = i+1
 
             if a < 0.33: #no correction for a_star applied
                 a_star = sigma*C_n/(4*F*np.sin(psi)**2)*(1-a)
@@ -184,15 +211,22 @@ def BEM_algorithm (s,theta_p,method):
         p_t_list.append(p_t)
 
         #Integrate over the blade elements to get total thrust and torque
-        thrust = np.trapz(p_n_list,r)
-        torque = np.trapz(p_t_list,r)
+        # thrust = np.trapz(p_n_list,mu)
+        # torque = np.trapz(p_t_list,mu)
 
-        P = torque*omega
-
-
-    return thrust, torque, P
+        # P = torque*omega
 
 
+    return p_n_list,p_t_list
+
+V_0 = 10
+theta_p = 0
+s = 5
+method = 'Madsen'
+#run test of BEM_algorithm with these values
+p_n, p_t= BEM_algorithm(s,theta_p,method)
+
+print(f"p_n: {p_n}, p_t: {p_t}")
 # R = 31
 # B = 3
 # rho = 1.225
