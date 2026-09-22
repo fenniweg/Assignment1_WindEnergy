@@ -100,7 +100,6 @@ def double_interpolation(alpha,t_over_c):
 
 def BEM_algorithm (s,theta_p,method):
     omega = s*V_0/R
-    omega = 0.9
     #Load blade data
     r_list = blade_dat['r'].values
     chord_list = blade_dat['c'].values
@@ -183,7 +182,10 @@ def BEM_algorithm (s,theta_p,method):
 
             if count > 1000:
                 print(f"Warning: BEM did not converge after 1000 iterations in element {i}")
+                #break and go to next element
+        
                 break
+            
 
 
         #if converged, calculate p_n and p_t for this blade element
@@ -208,42 +210,50 @@ def BEM_algorithm (s,theta_p,method):
 
     P = torque*omega
 
-
-    return thrust,torque,P
-
-V_0 = 10
-theta_p = 0
-s = 5
-method = ''
-#run test of BEM_algorithm with these values
-p_n, p_t= BEM_algorithm(s,theta_p,method)
-
-print(f"p_n: {p_n}, p_t: {p_t}")
-# R = 31
-# B = 3
-# rho = 1.225
-# V_0 = 8.0
-# omega = 2.61
-# theta_p = -3.0
-# beta = 2.0
-# chord = 1.7
-# C_l = 0.5
-# C_d= 0.01
-# r = 24.5
-
-# method = 'Polynomial' #third order polynomial
+    #Dimensionless Coefficients
+    A = np.pi*R**2
+    Cp = P/(0.5*rho*A*V_0**3)
+    CT = thrust/(0.5*rho*A*V_0**2)
 
 
-# a, a_prime ,p_t, p_n, F = bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method)
-# print(f"Method {method}:")
-# print(f"a: {a}, a': {a_prime}, p_t: {p_t}, p_n: {p_n}, F: {F}")
-
-# method = 'Madsen'#Madsen et al
+    return Cp
 
 
-# a, a_prime ,p_t, p_n, F = bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method)
-# print(f"Method {method}:")
-# print(f"a: {a}, a': {a_prime}, p_t: {p_t}, p_n: {p_n}, F: {F}")
+'TESTS'   
+
+# V_0 = 10
+# theta_p = 0
+# s = 5
+# method = ''
+# #run test of BEM_algorithm with these values
+# p_n, p_t= BEM_algorithm(s,theta_p,method)
+
+# print(f"p_n: {p_n}, p_t: {p_t}")
+# # R = 31
+# # B = 3
+# # rho = 1.225
+# # V_0 = 8.0
+# # omega = 2.61
+# # theta_p = -3.0
+# # beta = 2.0
+# # chord = 1.7
+# # C_l = 0.5
+# # C_d= 0.01
+# # r = 24.5
+
+# # method = 'Polynomial' #third order polynomial
+
+
+# # a, a_prime ,p_t, p_n, F = bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method)
+# # print(f"Method {method}:")
+# # print(f"a: {a}, a': {a_prime}, p_t: {p_t}, p_n: {p_n}, F: {F}")
+
+# # method = 'Madsen'#Madsen et al
+
+
+# # a, a_prime ,p_t, p_n, F = bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method)
+# # print(f"Method {method}:")
+# # print(f"a: {a}, a': {a_prime}, p_t: {p_t}, p_n: {p_n}, F: {F}")
 
 
 
