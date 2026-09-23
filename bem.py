@@ -4,79 +4,6 @@ import numpy as np
 from load_data import blade_dat, airfoil_data, R,n_blades,rho,v_min,v_max,V_0
 
 
-
-
-#old bem loop can be deleted when it wor
-def bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method):
-
-    a = 0
-    a_prime = 0
-    epsilon = 1e-7
-    
-
-    psi = np.arctan((1-a)*V_0/((1+a_prime)*omega*r))
-
-    
-    
-
-    C_n = C_l*np.cos(psi) + C_d*np.sin(psi)
-    C_t = C_l*np.sin(psi) - C_d*np.cos(psi)
-
-    sigma = chord*B/(2*np.pi*r) 
-    C_T = (1-a)**2*C_n*sigma/(np.sin(psi)**2)
-    
-    F = 2/np.pi*np.arccos(np.exp(-B/2*(R-r)/(r*np.sin(abs(psi)))))
-
-    i = 0
-
-    while True:
-
-        if a < 0.33: #no correction for a_star applied
-            a_star = sigma*C_n/(4*F*np.sin(psi)**2)*(1-a)
-        else: # a_star with correction
-            if method == 'Polynomial': #third order polynomial
-                dC_T = (1-a)**2*C_n*sigma/(np.sin(psi)**2)
-                a_star = dC_T/(4*F*(1-0.25*(5-3*a)*a))
-                
-            else: #Madsen et al
-                dC_T= (1-a)**2*C_n*sigma/(np.sin(psi)**2)
-                a_star = 0.246*(dC_T/F)+0.0586*(dC_T/F)**2+0.083*(dC_T/F)**3
-
-        a_new = 0.1*a_star+(1-0.1)*a #Update a with relaxation factor 0.1
-
-        #Update a_prime with relaxation factor 0.1, no correction for a_prime_star applied
-        a_prime_star = sigma*C_t/(4*F*np.sin(psi)*np.cos(psi))*(1+a_prime)
-        a_prime_new = 0.1*a_prime_star+(1-0.1)*a_prime
-
-        #Check for convergence
-        if abs(a_new - a) < epsilon and abs(a_prime_new - a_prime) < epsilon:
-            print(f"Converged after {i} iterations")
-            break
-        else:
-            a = a_new
-            a_prime = a_prime_new
-
-        if i > 1000:
-            print("Warning: BEM did not converge after 1000 iterations")
-            break
-
-        #Calculate psi, C_n, C_t, sigma, C_T, F for the next iteration or return
-        psi = np.arctan((1-a)*V_0/((1+a_prime)*omega*r))
-        C_n = C_l*np.cos(psi) + C_d*np.sin(psi)
-        C_t = C_l*np.sin(psi) - C_d*np.cos(psi)
-        
-        sigma = chord*B/(2*np.pi*r) 
-        C_T = (1-a)**2*C_n*sigma/(np.sin(psi)**2)
-            
-        F = 2/np.pi*np.arccos(np.exp(-B/2*(R-r)/(r*np.sin(abs(psi)))))
-
-        V_rel = V_0*(1-a)/np.sin(psi)
-
-        p_n = 0.5*rho*(V_rel)**2*chord*C_n
-        p_t = 0.5*rho*(V_rel)**2*chord*C_t
-
-    return a, a_prime, p_t,p_n,F
-
 def double_interpolation(alpha,t_over_c):
     C_l_thickness = np.zeros((6))
     C_d_thickness = np.zeros((6))
@@ -95,10 +22,14 @@ def double_interpolation(alpha,t_over_c):
 
     C_l = np.interp(t_over_c,x_p_sorted,y_p_sorted_C_l)
     C_d = np.interp(t_over_c,x_p_sorted,y_p_sorted_C_d)
-
     return C_l, C_d
 
-def BEM_algorithm (s,theta_p,method):
+
+def BEM_algorithm (s,theta_p,method = 'Polynomial', Loads = False):
+    '''
+    BEM_algorithm computes the power coefficient (Cp) and thrust coefficient (CT) for a given tip speed ratio (s), 
+    pitch angle (theta_p), and method ('Polynomial' or 'Madsen'). Polynomial is standard.'''
+
     omega = s*V_0/R
     #Load blade data
     r_list = blade_dat['r'].values
@@ -106,11 +37,11 @@ def BEM_algorithm (s,theta_p,method):
     beta_list = blade_dat['beta'].values
     t_over_c_list = blade_dat['t/c'].values
 
-    p_n_list = []
-    p_t_list = []
+    p_n_list = np.zeros(len(r_list))
+    p_t_list = np.zeros(len(r_list))
 
     #loop through each blade element
-    for i in range(len(r_list)):
+    for i in range(len(r_list)-1): #last element is tip, skip to avoid numerical issues
         r = r_list[i]
         chord = chord_list[i]
         beta = beta_list[i]
@@ -127,12 +58,12 @@ def BEM_algorithm (s,theta_p,method):
         count = 0
 
         while True:
-            count = count+1
+            count += 1
             #Calculate flowangle
-            psi = np.arctan((1-a)*V_0/((1+a_prime)*omega*r))
+            psi = np.arctan((1-a)*V_0/((1+a_prime)*omega*r)) #radians
     
             #Compute local angle of attack alpha
-            alpha = np.degrees(psi)-(beta+theta_p)
+            alpha = np.degrees(psi)-(beta+theta_p) #degrees
     
             #Lookup C_l and C_d from airfoil data based on alpha with double interpolation
             C_l, C_d = double_interpolation(alpha,t_over_c)
@@ -153,28 +84,28 @@ def BEM_algorithm (s,theta_p,method):
                 F = max(F, 1e-4)  # Avoid division by zero
 
             #Axial Induction Factor a and Tangential Induction Factor a_prime for chosen method
-
-            if a <= 0.33: #no correction for a_star applied
-                a_star = sigma*C_n/(4*F*np.sin(psi)**2)*(1-a)
-            else: # a_star with correction
-                if method == 'Polynomial': #third order polynomial
-                    # dC_T = (1-a)**2*C_n*sigma/(np.sin(psi)**2)
-                    a_star = dC_T/(4*F*(1-0.25*(5-3*a)*a))
+            if method  == 'Polynomial':
+                if a <= 0.33: #no correction for a_star applied
+                    a_star = sigma*C_n/(4*F*np.sin(psi)**2)*(1-a)
+                else: # a_star with correction
                     a_star = dC_T / (4.0 * F * (1.0 - 0.25 * (5.0 - 3.0 * a) * a))
-                if method =='Madsen': #Madsen et al
+            elif method =='Madsen': #Madsen et al
                     CT_F = dC_T / F
                     a_star = 0.246 * CT_F + 0.0586 * (CT_F**2) + 0.0883 * (CT_F**3)
-                    #a_star = 0.246*(dC_T/F)+0.0586*(dC_T/F)**2+0.0883*(dC_T/F)**3
 
+            else:
+                raise ValueError("Invalid method. Choose 'Polynomial' or 'Madsen'.")
+
+            #Update a and a_prime with relaxation factor 0.1
             a_new = 0.1*a_star+(1-0.1)*a #Update a with relaxation factor 0.1
 
-            #Update a_prime with relaxation factor 0.1, no correction for a_prime_star applied
             a_prime_star = sigma*C_t/(4*F*np.sin(psi)*np.cos(psi))*(1+a_prime)
             a_prime_new = 0.1*a_prime_star+(1-0.1)*a_prime
 
             #Check for convergence
             if abs(a_new - a) < epsilon and abs(a_prime_new - a_prime) < epsilon:
                 # print(f"Converged after {i} iterations")
+                a, a_prime = a_new, a_prime_new
                 break
             else:
                 a = a_new
@@ -197,8 +128,8 @@ def BEM_algorithm (s,theta_p,method):
         p_t = 0.5*rho*(V_rel)**2*chord*C_t
 
         #Save p_n and p_t for each blade element
-        p_n_list.append(p_n)
-        p_t_list.append(p_t)
+        p_n_list[i] = (p_n)
+        p_t_list[i]=(p_t)
         
 
     #Force last element to be zero to avoid numerical issues at the tip
@@ -206,7 +137,7 @@ def BEM_algorithm (s,theta_p,method):
     p_t_list[-1] = 0.0
     # Integrate over the blade elements to get total thrust and torque
     thrust = n_blades*np.trapz(p_n_list,r_list)
-    torque = np.trapz(r_list*p_t_list,r_list)
+    torque = n_blades*np.trapz(r_list*p_t_list,r_list)
 
     P = torque*omega
 
@@ -214,6 +145,9 @@ def BEM_algorithm (s,theta_p,method):
     A = np.pi*R**2
     Cp = P/(0.5*rho*A*V_0**3)
     CT = thrust/(0.5*rho*A*V_0**2)
+
+    if Loads == True:
+        return Cp,CT,thrust,P
 
 
     return Cp
@@ -224,7 +158,7 @@ def BEM_algorithm (s,theta_p,method):
 # V_0 = 10
 # theta_p = 0
 # s = 5
-# method = ''
+# method = 'Madsen'
 # #run test of BEM_algorithm with these values
 # p_n, p_t= BEM_algorithm(s,theta_p,method)
 

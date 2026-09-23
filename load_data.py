@@ -1,5 +1,8 @@
-##Load Airfoil Data and Blade Data to use in next steps
-##Define Turbine Parameters to use in other modules
+'''
+This file loads the necessary data for the wind turbine analysis, including airfoil data, blade data, and turbine parameters. 
+The data is used in subsequent modules for calculations related to the performance of the wind turbine.
+Data for the wind tubrine is defined here, including rotor radius, number of blades, rated power, cut-in and cut-out wind speeds, and air density.
+'''
 
 import numpy as np
 import pandas as pd
@@ -31,10 +34,8 @@ v_min = 4 #cut in wind speed
 v_max = 25 #cut out wind speed
 rho = 1.225 #air density in kg/m^3
 
-#not sure about this one, not given in assignment ?
-V_0 = 11 #wind speed at which to compute power coefficient, Cp ??
+A = np.pi*R**2 #rotor area in m^2
 
-
-
+V_0=11.19
 
 
