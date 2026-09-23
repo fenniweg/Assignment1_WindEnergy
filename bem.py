@@ -1,10 +1,14 @@
-#BEM algorithm steady
+'''This file contains functions to be used for Assignemnt 1 of Wind Energy course. 
+The functions include BEM_algorithm, double_interpolation, function_to_solve, and solve_pitch.
+'''
 
 import numpy as np
+from scipy.optimize import brentq
 from load_data import blade_dat, airfoil_data, R,n_blades,rho,v_min,v_max,V_0
 
 
 def double_interpolation(alpha,t_over_c):
+    """Double interpolation to find C_l and C_d for a given angle of attack (alpha) and thickness/chord ratio (t_over_c)."""
     C_l_thickness = np.zeros((6))
     C_d_thickness = np.zeros((6))
     
@@ -25,6 +29,27 @@ def double_interpolation(alpha,t_over_c):
     return C_l, C_d
 
 
+
+def function_to_solve(theta_p, lambda_i, cp_target):
+    """Function to solve for the pitch angle (theta_p) that achieves a target power coefficient (cp_target) at a given tip speed ratio (lambda_i)."""
+    Cp  = BEM_algorithm(lambda_i, theta_p)
+    return Cp - cp_target
+
+
+def solve_pitch(theta_p_low, theta_p_high, lambda_i, cp_target,optimum_theta):
+    """Solve Cp(lambda_i, theta_p) = cp_target using Brent's method."""
+    f_low = function_to_solve(theta_p_low, lambda_i, cp_target)
+    f_high = function_to_solve(theta_p_high, lambda_i, cp_target)
+
+    # At rated wind speed the target is exactly the maximum Cp, so the root is at the optimum pitch.
+    if np.isclose(cp_target, BEM_algorithm(lambda_i, optimum_theta), rtol=1e-8, atol=1e-8):
+        return optimum_theta
+    if np.isclose(f_low, 0.0, atol=1e-10):
+        return theta_p_low
+    if np.isclose(f_high, 0.0, atol=1e-10):
+        return theta_p_high
+
+    return brentq(function_to_solve, theta_p_low, theta_p_high, args=(lambda_i, cp_target))
 def BEM_algorithm (s,theta_p,method = 'Polynomial', Loads = False):
     '''
     BEM_algorithm computes the power coefficient (Cp) and thrust coefficient (CT) for a given tip speed ratio (s), 
@@ -151,43 +176,6 @@ def BEM_algorithm (s,theta_p,method = 'Polynomial', Loads = False):
 
 
     return Cp
-
-
-'TESTS'   
-
-# V_0 = 10
-# theta_p = 0
-# s = 5
-# method = 'Madsen'
-# #run test of BEM_algorithm with these values
-# p_n, p_t= BEM_algorithm(s,theta_p,method)
-
-# print(f"p_n: {p_n}, p_t: {p_t}")
-# # R = 31
-# # B = 3
-# # rho = 1.225
-# # V_0 = 8.0
-# # omega = 2.61
-# # theta_p = -3.0
-# # beta = 2.0
-# # chord = 1.7
-# # C_l = 0.5
-# # C_d= 0.01
-# # r = 24.5
-
-# # method = 'Polynomial' #third order polynomial
-
-
-# # a, a_prime ,p_t, p_n, F = bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method)
-# # print(f"Method {method}:")
-# # print(f"a: {a}, a': {a_prime}, p_t: {p_t}, p_n: {p_n}, F: {F}")
-
-# # method = 'Madsen'#Madsen et al
-
-
-# # a, a_prime ,p_t, p_n, F = bem (r, R, B,rho,V_0,omega,theta_p,beta,chord,C_l,C_d,method)
-# # print(f"Method {method}:")
-# # print(f"a: {a}, a': {a_prime}, p_t: {p_t}, p_n: {p_n}, F: {F}")
 
 
 
