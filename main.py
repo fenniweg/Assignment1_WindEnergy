@@ -14,6 +14,9 @@ import pandas as pd
 from bem import BEM_algorithm, solve_pitch
 from load_data import A, P_rated, R, rho, theta_p, tip_speed_ratio, v_max, v_min
 
+### settings for plotting
+plt.rcParams.update({'font.size': 11})
+
 ####QUESTION 1: Compare the results of the two methods by plotting the power coefficient, Cp, as a function of the tip speed ratio, λ and pitch angles, θp.
 #Initialize arrays
 Cp = np.zeros((len(tip_speed_ratio), len(theta_p), 2)) #Initialize array to store Cp values for each method
@@ -60,29 +63,27 @@ cp_madsen = pd.DataFrame(Cp[:,:,1], index=tip_speed_ratio, columns=theta_p) #Cre
 cp_poly.to_csv('results/Cp_polynomial.csv')
 cp_madsen.to_csv('results/Cp_madsen.csv')
 
+
 # Contour plot of Cp as a function of tip speed ratio and pitch angle for both methods
 THETA_GRID, LAMBDA_GRID = np.meshgrid(theta_p, tip_speed_ratio)
 
-fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
-
-for ax, cp_data, title, theta_opt, lambda_opt in [
-    (axs[0], Cp[:, :, 0], 'Polynomial Method - $C_p(\\lambda, \\theta_p)$ Contour',
-     optimum_theta_polynomial, optimum_lambda_polynomial),
-    (axs[1], Cp[:, :, 1], 'Madsen Method - $C_p(\\lambda, \\theta_p)$ Contour',
-     optimum_theta_madsen, optimum_lambda_madsen),
-]:
-    contour = ax.contourf(THETA_GRID, LAMBDA_GRID, cp_data, levels=20, cmap='viridis')
-    fig.colorbar(contour, ax=ax, label='$C_p$')
-    ax.scatter(theta_opt, lambda_opt, color='r', s=80, marker='*', label='Max $C_p$')
-    ax.set_title(title)
-    ax.set_xlabel('Pitch Angle $\\theta_p$ [deg]')
-    ax.set_ylabel('Tip Speed Ratio $\\lambda$')
-    ax.legend()
-    ax.grid(True)
-
-plt.tight_layout()
-plt.savefig('Figures/Cp_contour_comparison.png', dpi=300)
-print("Contour plots saved as 'Figures/Cp_contour_comparison.png'.")
+# Save all data needed for plotting in a separate script
+np.savez(
+    'results/Cp_plotting_data.npz',
+    theta_p=theta_p,
+    tip_speed_ratio=tip_speed_ratio,
+    THETA_GRID=THETA_GRID,
+    LAMBDA_GRID=LAMBDA_GRID,
+    Cp_polynomial=Cp[:, :, 0],
+    Cp_madsen=Cp[:, :, 1],
+    cp_max_polynomial=cp_max_polynomial,
+    cp_max_madsen=cp_max_madsen,
+    optimum_lambda_polynomial=optimum_lambda_polynomial,
+    optimum_theta_polynomial=optimum_theta_polynomial,
+    optimum_lambda_madsen=optimum_lambda_madsen,
+    optimum_theta_madsen=optimum_theta_madsen,
+)
+print("Saved plotting data to 'results/Cp_plotting_data.npz'.")
 
 print("Compute rated wind speed and maximum rotational speed at rated wind speed")
 C_p_max = cp_max_polynomial #from Q1 results
@@ -100,7 +101,6 @@ rpm_max = omega_max*60/(2*np.pi) #[rpm]
 print(f"Rated wind speed: {v_rated:.2f} m/s")
 print(f"Maximum rotational speed at rated wind speed: {omega_max:.2f} rad/s ({rpm_max:.2f} rpm)")
 
-
 print('Compute power as a function of wind speed from cut-in to max speed ')
 
 v_sweep = np.linspace(v_min, v_rated, 20) #Sweep wind speed from cut-in to rated
@@ -110,42 +110,16 @@ P_sweep = 0.5*rho*A*C_p_max*v_sweep**3 #Calculate power for each wind speed
 v_sweep = np.append(v_sweep, np.linspace(v_rated, v_max, 100)) #Sweep wind speed from rated to max
 rpm_sweep = np.append(rpm_sweep, np.full(100, rpm_max)) #Omega is constant at omega_max above rated wind speed
 P_sweep = np.append(P_sweep, np.full(100, P_rated)) #Power is constant at rated power above rated wind speed
+# Save sweep data for use in other scripts/plotting
 
-#Plot 1, omega vs wind speed from cut-in to max speed
-plt.figure(figsize=(10,6))
-plt.plot(v_sweep, rpm_sweep, 'b-', linewidth=2.5, label='Rotational Speed $\\omega(V_0)$')
-# Add a vertical dashed line to highlight the rated wind speed point
-plt.axvline(v_rated, color='red', linestyle='--', 
-            label=f'Rated Wind Speed = {v_rated:.2f} m/s')
+np.savez('results/sweep_plotting_data.npz',
+         v_sweep=v_sweep,
+         rpm_sweep=rpm_sweep,
+         P_sweep=P_sweep,
+         v_rated=v_rated,
+         rpm_max=rpm_max)
+print("Saved plotting data to 'results/sweep_plotting_data.npz'.")
 
-plt.axhline(rpm_max, color='green', linestyle='--',
-            label=f'Maximum Rotational Speed = {rpm_max:.2f} rpm')
-
-# Format the plot with titles, labels, and grid
-plt.title('DTU 10MW: Rotational Speed vs Wind Speed', fontsize=14)
-plt.xlabel('Wind Speed $V_0$ [m/s]', fontsize=12)
-plt.ylabel('Rotational Speed [RPM]', fontsize=12)
-plt.grid(True, linestyle=':', alpha=0.7)
-plt.legend(fontsize=11)
-plt.tight_layout()
-plt.savefig('Figures/omega_vs_wind_speed.png', dpi=300)
-
-
-#Plot power against wind speed from cut-in to max speed
-plt.figure(figsize=(10,6))
-plt.plot(v_sweep, P_sweep, 'g-', linewidth=2.5, label='Power $P(V_0)$')
-plt.axvline(v_rated, color='red', linestyle='--', 
-            label=f'Rated Wind Speed = {v_rated:.2f} m/s')
-plt.axhline(P_rated, color='blue', linestyle='--',
-            label=f'Rated Power = {P_rated:.2f} W')
-plt.grid(True, linestyle=':', alpha=0.7)
-plt.title('DTU 10MW: Power vs Wind Speed', fontsize=14)
-plt.xlabel('Wind Speed $V_0$ [m/s]', fontsize=12)
-plt.ylabel('Power [W]', fontsize=12)
-plt.legend(fontsize=11)
-plt.savefig('Figures/power_vs_wind_speed.png', dpi=300)
-
-print('Plots for Q2 saved in Figures folder')
 
 ### QUESTION 3: Implement stall and feather pitching to limit the mechanical power to P_rated and the rotational speed to omega_max.
 
@@ -216,51 +190,22 @@ P_sweep_stall = np.concatenate((P_sweep_below_rated, P_sweep_stall))
 T_sweep_feather = np.concatenate((T_sweep_below_rated, T_sweep_feather))
 T_sweep_stall = np.concatenate((T_sweep_below_rated, T_sweep_stall))
 
-# ---------------------------------------------------------------------------
-# Plot the required quantities.
-# ---------------------------------------------------------------------------
-
-#4 plots: 1) P vs V0, 2) theta_p vs V0, 3) T vs V0, 4) Cp and Ct vs V0 with each feather and stall pitch
-
-fig,axs = plt.subplots(2,2,figsize=(12,10))
-axs[0,0].plot(v_sweep, P_sweep_feather, 'b-', lw=2.5, label='Feather')
-axs[0,0].plot(v_sweep, P_sweep_stall, 'r--', lw=2.5, label='Stall')
-axs[0,0].axhline(P_rated, color='k', ls='--', lw=1.5, label='Rated power')
-axs[0,0].set_xlabel('Wind speed $V_0$ [m/s]')
-axs[0,0].set_ylabel('Mechanical power $P$ [W]')
-axs[0,0].set_title('Power regulation by pitching')
-axs[0,0].grid(True, alpha=0.3)
-
-
-axs[0,1].plot(v_sweep, theta_p_sweep_feather, 'b-', lw=2.5, label='Feather')
-axs[0,1].plot(v_sweep, theta_p_sweep_stall, 'r--', lw=2.5, label='Stall')
-axs[0,1].set_xlabel('Wind speed $V_0$ [m/s]')
-axs[0,1].set_ylabel(r'Pitch angle $\theta_p$ [deg]')
-axs[0,1].set_title(r'Pitch angle required for rated power at $\omega_{max}$')
-axs[0,1].grid(True, alpha=0.3)
-
-axs[1,0].plot(v_sweep, T_sweep_feather, 'b-', lw=2.5, label='Feather')
-axs[1,0].plot(v_sweep, T_sweep_stall, 'r--', lw=2.5, label='Stall')
-axs[1,0].set_xlabel('Wind speed $V_0$ [m/s]')
-axs[1,0].set_ylabel('Thrust $T$ [N]')
-axs[1,0].set_title('Thrust at rated-speed power limit')
-axs[1,0].grid(True, alpha=0.3)
-
-axs[1,1].plot(v_sweep, Cp_sweep_feather, 'b-', lw=2.5, label=r'$C_p$ feather')
-axs[1,1].plot(v_sweep, Cp_sweep_stall, 'r--', lw=2.5, label=r'$C_p$ stall')
-axs[1,1].plot(v_sweep, Ct_sweep_feather, 'b:', lw=2.0, label=r'$C_T$ feather')
-axs[1,1].plot(v_sweep, Ct_sweep_stall, 'r:', lw=2.0, label=r'$C_T$ stall')
-axs[1,1].set_xlabel('Wind speed $V_0$ [m/s]')
-axs[1,1].set_ylabel('Coefficient value')    
-axs[1,1].set_title('Dimensionless coefficients for each pitch strategy')
-axs[1,1].grid(True, alpha=0.3)
-for ax in axs.flat:
-    ax.legend()
-
-plt.tight_layout()
-
-plt.savefig('Figures/Q3_pitch_control.png', dpi=300)
-print("Plots for Q3 saved in Figures folder")
+np.savez('results/Q3_pitch_control_plotting_data.npz',
+         v_sweep=v_sweep,
+            theta_p_sweep_feather=theta_p_sweep_feather,
+            theta_p_sweep_stall=theta_p_sweep_stall,
+            Cp_sweep_feather=Cp_sweep_feather,
+            Ct_sweep_feather=Ct_sweep_feather,
+            Cp_sweep_stall=Cp_sweep_stall,
+            Ct_sweep_stall=Ct_sweep_stall,
+            P_sweep_feather=P_sweep_feather,
+            P_sweep_stall=P_sweep_stall,
+            T_sweep_feather=T_sweep_feather,
+            T_sweep_stall=T_sweep_stall,
+            v_rated=v_rated,
+            rpm_max=rpm_max,
+            P_rated=P_rated)
+print("Saved plotting data to 'results/Q3_pitch_control_plotting_data.npz")
 print('Simulation done :)')
 
 
