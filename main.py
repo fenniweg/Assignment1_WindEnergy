@@ -7,12 +7,12 @@ The results are plotted to visualize the performance characteristics of the wind
 
 ### IMPORT LIBRARIES AND DATA ###
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-from scipy.optimize import brentq
+
 from bem import BEM_algorithm, solve_pitch
-from load_data import v_min,v_max,P_rated,R,rho,tip_speed_ratio, theta_p
+from load_data import A, P_rated, R, rho, theta_p, tip_speed_ratio, v_max, v_min
 
 ####QUESTION 1: Compare the results of the two methods by plotting the power coefficient, Cp, as a function of the tip speed ratio, λ and pitch angles, θp.
 #Initialize arrays
@@ -27,16 +27,16 @@ for method in ['Polynomial','Madsen']:
 
     for s in tip_speed_ratio:
         for theta in theta_p:
-            Cp_value = BEM_algorithm(s,theta,method) #Call BEM_algorithm function to compute Cp for combinaion 
+            Cp_value,_ = BEM_algorithm(s,theta,method) #Call BEM_algorithm function to compute Cp for combinaion 
             Cp[np.where(tip_speed_ratio==s)[0][0], np.where(theta_p==theta)[0][0], 0 if method=='Polynomial' else 1] = Cp_value #Store Cp value in array for correct method
     print(f"Completed BEM_algorithm for method: {method}")
 
-df = pd.DataFrame(Cp[:,:,0], index=tip_speed_ratio, columns=theta_p) #Create DataFrame for Polynomial method
-df2 = pd.DataFrame(Cp[:,:,1], index=tip_speed_ratio, columns=theta_p) #Create DataFrame for Madsen method
+
 
 
 #extract optimum
 # Find the maximum Cp value and its corresponding tip speed ratio and pitch angle for each method
+
 optimum_index_polynomial = np.unravel_index(np.argmax(Cp[:,:,0]), Cp[:,:,0].shape)
 optimum_index_madsen = np.unravel_index(np.argmax(Cp[:,:,1]), Cp[:,:,1].shape)
 
@@ -49,17 +49,16 @@ optimum_theta_polynomial = theta_p[optimum_index_polynomial[1]]
 optimum_lambda_madsen = tip_speed_ratio[optimum_index_madsen[0]]
 optimum_theta_madsen = theta_p[optimum_index_madsen[1]]
 print("Search for maximum Cp values completed.")    
-print("\n=================== RESULTS ===================")
 #results
 print(f"Polynomial Method: Cp_max = {cp_max_polynomial:.4f}, λ_max = {optimum_lambda_polynomial:.2f}, θp_max = {optimum_theta_polynomial:.2f}")
 print(f"Madsen Method: Cp_max = {cp_max_madsen:.4f}, λ_max = {optimum_lambda_madsen:.2f}, θp_max = {optimum_theta_madsen:.2f}") 
 
-#Save results to load_data.py to use in Q2.py
-with open('load_data.py', 'r') as file:
-    lines = file.readlines()
-    V_0 = 11.19
-    optimum_theta = optimum_theta_polynomial
+#Save results to  file to use for plotting in seperate file
+cp_poly = pd.DataFrame(Cp[:,:,0], index=tip_speed_ratio, columns=theta_p) #Create DataFrame for Polynomial method
+cp_madsen = pd.DataFrame(Cp[:,:,1], index=tip_speed_ratio, columns=theta_p) #Create DataFrame for Madsen method
 
+cp_poly.to_csv('results/Cp_polynomial.csv')
+cp_madsen.to_csv('results/Cp_madsen.csv')
 
 # Contour plot of Cp as a function of tip speed ratio and pitch angle for both methods
 THETA_GRID, LAMBDA_GRID = np.meshgrid(theta_p, tip_speed_ratio)
@@ -90,10 +89,6 @@ C_p_max = cp_max_polynomial #from Q1 results
 optimum_lambda = optimum_lambda_polynomial #from Q1 results
 optimum_theta = optimum_theta_polynomial #from Q1 results
 
-
-#Calculate rotor area
-A = np.pi*R**2
-
 #Calculate rated wind speed
 v_rated = (P_rated/(0.5*rho*A*C_p_max))**(1/3)
 
@@ -105,10 +100,10 @@ rpm_max = omega_max*60/(2*np.pi) #[rpm]
 print(f"Rated wind speed: {v_rated:.2f} m/s")
 print(f"Maximum rotational speed at rated wind speed: {omega_max:.2f} rad/s ({rpm_max:.2f} rpm)")
 
-print('Compute omega as a function of wind speed from cut-in to max speed')
+
 print('Compute power as a function of wind speed from cut-in to max speed ')
 
-v_sweep = np.linspace(v_min, v_rated, 100) #Sweep wind speed from cut-in to rated
+v_sweep = np.linspace(v_min, v_rated, 20) #Sweep wind speed from cut-in to rated
 omega_sweep = (optimum_lambda*v_sweep)/R #Calculate omega for each wind speed
 rpm_sweep = omega_sweep*60/(2*np.pi) #Convert omega to rpm
 P_sweep = 0.5*rho*A*C_p_max*v_sweep**3 #Calculate power for each wind speed
@@ -162,6 +157,7 @@ print('Plots for Q2 saved in Figures folder')
 # ---------------------------------------------------------------------------
 # Sweep between cut-in and cut-out wind speed, leave out rated wind speed since it is already known.
 # ---------------------------------------------------------------------------
+print("Compute pitch angle, Cp, Ct, T and P as a function of wind speed from rated to max speed for feather and stall pitching")
 v_sweep = np.linspace(v_rated+0.1, v_max, 10)
 theta_p_sweep_feather = np.zeros_like(v_sweep)
 theta_p_sweep_stall = np.zeros_like(v_sweep)
@@ -176,18 +172,49 @@ T_sweep_stall = np.zeros_like(v_sweep)
 
 for i, v in enumerate(v_sweep):
     lambda_i = omega_max * R / v
+
     cp_target = P_rated / (0.5 * rho * A * v**3)
 
     # Feather: increase pitch angle above the optimal setting to reduce Cp.
     # Stall: decrease pitch angle below the optimal setting to reduce Cp.
-    theta_f = solve_pitch(0.0, 40.0, lambda_i, cp_target,optimum_theta = optimum_theta)
-    theta_s = solve_pitch(-40.0, 0.0, lambda_i, cp_target,optimum_theta = optimum_theta)
+    theta_f = solve_pitch(0.0, 40.0, lambda_i, cp_target)
+    theta_s = solve_pitch(-40.0, 0.0, lambda_i, cp_target)
     theta_p_sweep_feather[i] = theta_f
     theta_p_sweep_stall[i] = theta_s
 
     #compute final Cp, Ct, T and P for feather and stall pitching
-    Cp_sweep_feather[i], Ct_sweep_feather[i],T_sweep_feather[i],P_sweep_feather[i] = BEM_algorithm(lambda_i, theta_f,Loads = True)
-    Cp_sweep_stall[i], Ct_sweep_stall[i],T_sweep_stall[i],P_sweep_stall[i] = BEM_algorithm(lambda_i, theta_s,Loads = True)
+    Cp_sweep_feather[i], Ct_sweep_feather[i] = BEM_algorithm(lambda_i, theta_f)
+    Cp_sweep_stall[i],Ct_sweep_stall[i] = BEM_algorithm(lambda_i, theta_s)
+    P_sweep_feather[i] = 0.5*rho*A*Cp_sweep_feather[i]*v**3
+    P_sweep_stall[i] = 0.5*rho*A*Cp_sweep_stall[i]*v**3
+    T_sweep_feather[i] = Ct_sweep_feather[i]*0.5*rho*A*v**2
+    T_sweep_stall[i] = Ct_sweep_stall[i]*0.5*rho*A*v**2
+    
+#get cp,ct,power,thrust,pitch from 0 to rated wind speed for plotting
+v_sweep_below_rated = np.linspace(v_min, v_rated, 15)
+Cp_sweep_below_rated = np.zeros_like(v_sweep_below_rated)
+Ct_sweep_below_rated = np.zeros_like(v_sweep_below_rated)
+T_sweep_below_rated = np.zeros_like(v_sweep_below_rated)
+P_sweep_below_rated = np.zeros_like(v_sweep_below_rated)
+
+for i, v in enumerate(v_sweep_below_rated):
+    lambda_i = omega_max * R / v
+    Cp_sweep_below_rated[i], Ct_sweep_below_rated[i] = BEM_algorithm(lambda_i, optimum_theta)
+    P_sweep_below_rated[i] = 0.5*rho*A*Cp_sweep_below_rated[i]*v**3
+    T_sweep_below_rated[i] = Ct_sweep_below_rated[i]*0.5*rho*A*v**2
+
+#put arrays together for plotting
+v_sweep = np.concatenate((v_sweep_below_rated, v_sweep))
+theta_p_sweep_feather = np.concatenate((np.full_like(v_sweep_below_rated, optimum_theta), theta_p_sweep_feather))
+theta_p_sweep_stall = np.concatenate((np.full_like(v_sweep_below_rated,optimum_theta),theta_p_sweep_stall))
+Cp_sweep_feather = np.concatenate((Cp_sweep_below_rated, Cp_sweep_feather))
+Ct_sweep_feather = np.concatenate((Ct_sweep_below_rated, Ct_sweep_feather))
+Cp_sweep_stall = np.concatenate((Cp_sweep_below_rated, Cp_sweep_stall))
+Ct_sweep_stall = np.concatenate((Ct_sweep_below_rated, Ct_sweep_stall))
+P_sweep_feather = np.concatenate((P_sweep_below_rated, P_sweep_feather))
+P_sweep_stall = np.concatenate((P_sweep_below_rated, P_sweep_stall))
+T_sweep_feather = np.concatenate((T_sweep_below_rated, T_sweep_feather))
+T_sweep_stall = np.concatenate((T_sweep_below_rated, T_sweep_stall))
 
 # ---------------------------------------------------------------------------
 # Plot the required quantities.
@@ -233,3 +260,7 @@ for ax in axs.flat:
 plt.tight_layout()
 
 plt.savefig('Figures/Q3_pitch_control.png', dpi=300)
+print("Plots for Q3 saved in Figures folder")
+print('Simulation done :)')
+
+

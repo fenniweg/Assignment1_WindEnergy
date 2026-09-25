@@ -4,7 +4,8 @@ The functions include BEM_algorithm, double_interpolation, function_to_solve, an
 
 import numpy as np
 from scipy.optimize import brentq
-from load_data import blade_dat, airfoil_data, R,n_blades,rho,v_min,v_max,V_0
+
+from load_data import V_0, A, R, airfoil_data, blade_dat, n_blades, rho, v_max, v_min
 
 
 def double_interpolation(alpha,t_over_c):
@@ -32,17 +33,19 @@ def double_interpolation(alpha,t_over_c):
 
 def function_to_solve(theta_p, lambda_i, cp_target):
     """Function to solve for the pitch angle (theta_p) that achieves a target power coefficient (cp_target) at a given tip speed ratio (lambda_i)."""
-    Cp  = BEM_algorithm(lambda_i, theta_p)
+    Cp,_  = BEM_algorithm(lambda_i, theta_p)
     return Cp - cp_target
 
 
-def solve_pitch(theta_p_low, theta_p_high, lambda_i, cp_target,optimum_theta):
+def solve_pitch(theta_p_low, theta_p_high, lambda_i, cp_target):
     """Solve Cp(lambda_i, theta_p) = cp_target using Brent's method."""
+    optimum_theta = -0.11 # Initialize optimum_theta to a default value
     f_low = function_to_solve(theta_p_low, lambda_i, cp_target)
     f_high = function_to_solve(theta_p_high, lambda_i, cp_target)
 
     # At rated wind speed the target is exactly the maximum Cp, so the root is at the optimum pitch.
-    if np.isclose(cp_target, BEM_algorithm(lambda_i, optimum_theta), rtol=1e-8, atol=1e-8):
+    cp,_ = BEM_algorithm(lambda_i, optimum_theta)
+    if np.isclose(cp_target, cp, rtol=1e-8, atol=1e-8):
         return optimum_theta
     if np.isclose(f_low, 0.0, atol=1e-10):
         return theta_p_low
@@ -50,7 +53,7 @@ def solve_pitch(theta_p_low, theta_p_high, lambda_i, cp_target,optimum_theta):
         return theta_p_high
 
     return brentq(function_to_solve, theta_p_low, theta_p_high, args=(lambda_i, cp_target))
-def BEM_algorithm (s,theta_p,method = 'Polynomial', Loads = False):
+def BEM_algorithm (s,theta_p,method = 'Polynomial',return_loads = False,V_0 = V_0):
     '''
     BEM_algorithm computes the power coefficient (Cp) and thrust coefficient (CT) for a given tip speed ratio (s), 
     pitch angle (theta_p), and method ('Polynomial' or 'Madsen'). Polynomial is standard.'''
@@ -160,23 +163,23 @@ def BEM_algorithm (s,theta_p,method = 'Polynomial', Loads = False):
     #Force last element to be zero to avoid numerical issues at the tip
     p_n_list[-1] = 0.0
     p_t_list[-1] = 0.0
+    if return_loads == True:
+        return p_n_list,p_t_list
     # Integrate over the blade elements to get total thrust and torque
     thrust = n_blades*np.trapz(p_n_list,r_list)
     torque = n_blades*np.trapz(r_list*p_t_list,r_list)
 
     P = torque*omega
 
-    #Dimensionless Coefficients
-    A = np.pi*R**2
+    #Dimensionless Coefficient
     Cp = P/(0.5*rho*A*V_0**3)
     CT = thrust/(0.5*rho*A*V_0**2)
 
-    if Loads == True:
-        return Cp,CT,thrust,P
+    return Cp,CT
 
 
-    return Cp
+# lambda_i = 0.98 * R / 11.19
+# theta_f = solve_pitch(0.0, 40.0,lambda_i , 0.45)
 
-
-
+# print(f"Feather pitch angle for lambda_i = {lambda_i:.2f} and cp_target = 0.45 is {theta_f:.2f} degrees")
 
