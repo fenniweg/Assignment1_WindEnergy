@@ -14,9 +14,6 @@ import pandas as pd
 from bem import BEM_algorithm, solve_pitch
 from load_data import A, P_rated, R, rho, theta_p, tip_speed_ratio, v_max, v_min
 
-### settings for plotting
-plt.rcParams.update({'font.size': 11})
-
 ####QUESTION 1: Compare the results of the two methods by plotting the power coefficient, Cp, as a function of the tip speed ratio, λ and pitch angles, θp.
 #Initialize arrays
 Cp = np.zeros((len(tip_speed_ratio), len(theta_p), 2)) #Initialize array to store Cp values for each method
@@ -34,10 +31,6 @@ for method in ['Polynomial','Madsen']:
             Cp[np.where(tip_speed_ratio==s)[0][0], np.where(theta_p==theta)[0][0], 0 if method=='Polynomial' else 1] = Cp_value #Store Cp value in array for correct method
     print(f"Completed BEM_algorithm for method: {method}")
 
-
-
-
-#extract optimum
 # Find the maximum Cp value and its corresponding tip speed ratio and pitch angle for each method
 
 optimum_index_polynomial = np.unravel_index(np.argmax(Cp[:,:,0]), Cp[:,:,0].shape)
@@ -55,14 +48,6 @@ print("Search for maximum Cp values completed.")
 #results
 print(f"Polynomial Method: Cp_max = {cp_max_polynomial:.4f}, λ_max = {optimum_lambda_polynomial:.2f}, θp_max = {optimum_theta_polynomial:.2f}")
 print(f"Madsen Method: Cp_max = {cp_max_madsen:.4f}, λ_max = {optimum_lambda_madsen:.2f}, θp_max = {optimum_theta_madsen:.2f}") 
-
-#Save results to  file to use for plotting in seperate file
-cp_poly = pd.DataFrame(Cp[:,:,0], index=tip_speed_ratio, columns=theta_p) #Create DataFrame for Polynomial method
-cp_madsen = pd.DataFrame(Cp[:,:,1], index=tip_speed_ratio, columns=theta_p) #Create DataFrame for Madsen method
-
-cp_poly.to_csv('results/Cp_polynomial.csv')
-cp_madsen.to_csv('results/Cp_madsen.csv')
-
 
 # Contour plot of Cp as a function of tip speed ratio and pitch angle for both methods
 THETA_GRID, LAMBDA_GRID = np.meshgrid(theta_p, tip_speed_ratio)
@@ -85,7 +70,25 @@ np.savez(
 )
 print("Saved plotting data to 'results/Cp_plotting_data.npz'.")
 
+#Question 2: Compute rated wind speed and maximum rotational speed at rated wind speed
+
 print("Compute rated wind speed and maximum rotational speed at rated wind speed")
+C_p_max = cp_max_madsen #from Q1 results
+optimum_lambda = optimum_lambda_madsen #from Q1 results
+optimum_theta = optimum_theta_madsen #from Q1 results
+#Calculate rated wind speed
+v_rated = (P_rated/(0.5*rho*A*C_p_max))**(1/3)
+#Calculate maximum rotational speed at rated wind speed
+omega_max = (optimum_lambda*v_rated)/R #[rad/s]
+rpm_max = omega_max*60/(2*np.pi) #[rpm]
+
+
+print('Using results from Madsen method for rated wind speed and maximum rotational speed at rated wind speed:')
+print(f"Rated wind speed: {v_rated:.2f} m/s")
+print(f"Maximum rotational speed at rated wind speed: {omega_max:.2f} rad/s ({rpm_max:.2f} rpm)")
+
+print('Compute power as a function of wind speed from cut-in to max speed ')
+
 C_p_max = cp_max_polynomial #from Q1 results
 optimum_lambda = optimum_lambda_polynomial #from Q1 results
 optimum_theta = optimum_theta_polynomial #from Q1 results
@@ -98,6 +101,7 @@ omega_max = (optimum_lambda*v_rated)/R #[rad/s]
 rpm_max = omega_max*60/(2*np.pi) #[rpm]
 
 #Output results
+print('Using results from Polynomial method for power sweep from cut-in to max speed:')
 print(f"Rated wind speed: {v_rated:.2f} m/s")
 print(f"Maximum rotational speed at rated wind speed: {omega_max:.2f} rad/s ({rpm_max:.2f} rpm)")
 
@@ -110,14 +114,15 @@ P_sweep = 0.5*rho*A*C_p_max*v_sweep**3 #Calculate power for each wind speed
 v_sweep = np.append(v_sweep, np.linspace(v_rated, v_max, 100)) #Sweep wind speed from rated to max
 rpm_sweep = np.append(rpm_sweep, np.full(100, rpm_max)) #Omega is constant at omega_max above rated wind speed
 P_sweep = np.append(P_sweep, np.full(100, P_rated)) #Power is constant at rated power above rated wind speed
+omega_sweep = np.append(omega_sweep, np.full(100, omega_max)) #Omega is constant at omega_max above rated wind speed
 # Save sweep data for use in other scripts/plotting
 
 np.savez('results/sweep_plotting_data.npz',
          v_sweep=v_sweep,
-         rpm_sweep=rpm_sweep,
+         omega_sweep=omega_sweep,
          P_sweep=P_sweep,
          v_rated=v_rated,
-         rpm_max=rpm_max)
+         omega_max=omega_max)
 print("Saved plotting data to 'results/sweep_plotting_data.npz'.")
 
 
@@ -125,7 +130,7 @@ print("Saved plotting data to 'results/sweep_plotting_data.npz'.")
 
 # ---------------------------------------------------------------------------
 # Find the pitch setting that makes the power equal to the rated power.
-# For feather pitching, a larger pitch angle reduces Cp.
+# For femather pitching, a larger pitch angle reduces Cp.
 # For stall pitching, a smaller pitch angle reduces Cp.
 # --------------------------------------------------------------------------
 # ---------------------------------------------------------------------------

@@ -3,13 +3,12 @@ The plots generated are:
 1. Cp as a function of tip speed ratio and pitch angle for both Polynomial and Madsen methods.
 2. Power, pitch angle, thrust and Cp/Ct as a function of wind speed for feather and stall pitching.'''
 
-import os
-import glob
 
-import numpy as np
+
 import matplotlib.pyplot as plt
-from load_data import v_min, v_max, P_rated, R, rho, A
+import numpy as np
 
+from load_data import P_rated
 
 #load npz files with results from main.py
 npzfile = np.load('results/Cp_plotting_data.npz')
@@ -28,9 +27,9 @@ optimum_theta_madsen = npzfile['optimum_theta_madsen']
 
 npzfile = np.load('results/sweep_plotting_data.npz')
 v_sweep1 = npzfile['v_sweep']
-rpm_sweep = npzfile['rpm_sweep']
+omega_sweep = npzfile['omega_sweep']
 P_sweep = npzfile['P_sweep']
-rpm_max = npzfile['rpm_max']
+omega_max = npzfile['omega_max']
 
 npzfile = np.load('results/Q3_pitch_control_plotting_data.npz')
 v_sweep = npzfile['v_sweep']
@@ -48,9 +47,8 @@ v_rated = npzfile['v_rated']
 
 print("Imported plotting data from 'results' folder for Q1, Q2 and Q3.")
 
-
+'Q1: Contour plot of Cp as a function of tip speed ratio and pitch angle for both Polynomial and Madsen methods'
 fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
-#rasterize the contour plots for better visualization
 
 for ax, cp_data, title, theta_opt, lambda_opt in [
     (axs[0], Cp_polynomial, 'Polynomial Method - $C_p(\\lambda, \\theta_p)$ Contour',
@@ -70,21 +68,21 @@ for ax, cp_data, title, theta_opt, lambda_opt in [
 plt.tight_layout()
 fig.savefig('Figures/Cp_contour_comparison_raster.pdf', dpi=300)
 
-
+'Q2: Plot omega and P vs wind speed up to max speed'
 # Plot 1, omega vs wind speed from cut-in to max speed
 plt.figure(figsize=(10, 6))
-plt.plot(v_sweep1, rpm_sweep, 'b-', linewidth=2.8, label='Rotational Speed $\\omega(V_0)$')
+plt.plot(v_sweep1, omega_sweep, 'b-', linewidth=2.8, label='Rotational Speed $\\omega(V_0)$')
 # Add a vertical dashed line to highlight the rated wind speed point
 plt.axvline(v_rated, color='red', linestyle='--', linewidth=2.0,
             label=f'Rated Wind Speed = {v_rated:.2f} m/s')
 
-plt.axhline(rpm_max, color='green', linestyle='--', linewidth=2.0,
-            label=f'Maximum Rotational Speed = {rpm_max:.2f} rpm')
+plt.axhline(omega_max, color='green', linestyle='--', linewidth=2.0,
+            label=f'Maximum Rotational Speed = {omega_max:.2f} rad')
 
 # Format the plot with titles, labels, and grid
 plt.title('DTU 10MW: Rotational Speed vs Wind Speed', fontsize=12)
 plt.xlabel('Wind Speed $V_0$ [m/s]', fontsize=12)
-plt.ylabel('Rotational Speed [RPM]', fontsize=12)
+plt.ylabel('Rotational Speed [rad/s]', fontsize=12)
 plt.grid(True, linestyle=':', alpha=0.7, linewidth=1.0)
 plt.legend(fontsize=11)
 plt.tight_layout()
